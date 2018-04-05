@@ -222,7 +222,35 @@ namespace mars {
       if(!initialized) init();
 
       if(handleLibraryLoading) {
+<<<<<<< HEAD
         loadCoreLibs();
+=======
+        coreConfigFile = configDir+"/core_libs.txt";
+        plugin_config = fopen(coreConfigFile.c_str() , "r");
+        if(plugin_config) {
+          fclose(plugin_config);
+          libManager->loadConfigFile(coreConfigFile);
+        } else {
+          fprintf(stderr, "Loading default core libraries...\n");
+          libManager->loadLibrary("data_broker");
+          libManager->loadLibrary("mars_sim");
+          if(!noGUI) {
+            libManager->loadLibrary("main_gui");
+            libManager->loadLibrary("mars_graphics");
+            libManager->loadLibrary("mars_gui");
+            libManager->loadLibrary("entity_view");
+          }
+
+          // TODO_A: why not add envire_manager as plugin over configuration files
+          libManager->loadLibrary("envire_managers");
+          libManager->loadLibrary("envire_smurf_loader");
+
+          //libManager->loadLibrary("mars_scene_loader");
+          //libManager->loadLibrary("mars_entity_factory");
+          //libManager->loadLibrary("mars_smurf");
+          //clibManager->loadLibrary("mars_smurf_loader");
+        }
+>>>>>>> adapt mars to use envire managers
       }
 
       // then get the simulation
