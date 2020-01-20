@@ -1,5 +1,5 @@
 /*
- *  Copyright 2012, 2017, DFKI GmbH Robotics Innovation Center
+ *  Copyright 2012, DFKI GmbH Robotics Innovation Center
  *
  *  This file is part of the MARS simulation framework.
  *
@@ -20,19 +20,17 @@
 
 /**
  * \file MARS.cpp
- * \author Malte Langosz
+ * \author Malte Roemmermann
  *
  */
 
 #include "MARS.h"
 
-#ifndef NO_GUI
 #include "GraphicsTimer.h"
-#include <mars/main_gui/MainGUI.h>
-#endif
 
 #include <lib_manager/LibManager.hpp>
 #include <lib_manager/LibInterface.hpp>
+#include <mars/main_gui/MainGUI.h>
 #include <mars/interfaces/sim/SimulatorInterface.h>
 #include <mars/interfaces/gui/MarsGuiInterface.h>
 #include <mars/interfaces/sim/ControlCenter.h>
@@ -40,6 +38,7 @@
 #include <mars/utils/misc.h>
 #include <mars/cfg_manager/CFGManagerInterface.h>
 
+#include <QDir>
 
 #ifdef WIN32
   #include <Windows.h>
@@ -174,57 +173,13 @@ namespace mars {
       initialized = true;
     }
 
-    void MARS::loadCoreLibs() {
-      FILE *plugin_config;
-      coreConfigFile = configDir+"/core_libs.txt";
-      plugin_config = fopen(coreConfigFile.c_str() , "r");
-      if(plugin_config) {
-        fclose(plugin_config);
-        libManager->loadConfigFile(coreConfigFile);
-      } else {
-        fprintf(stderr, "Loading default core libraries...\n");
-        libManager->loadLibrary("data_broker");
-        libManager->loadLibrary("mars_sim");
-        libManager->loadLibrary("mars_scene_loader");
-        libManager->loadLibrary("mars_entity_factory");
-        libManager->loadLibrary("mars_smurf");
-        libManager->loadLibrary("mars_smurf_loader");
-        if(!noGUI) {
-          libManager->loadLibrary("main_gui");
-          libManager->loadLibrary("mars_graphics");
-          libManager->loadLibrary("mars_gui");
-          libManager->loadLibrary("entity_view");
-        }
-      }
-    }
-
-    void MARS::loadAdditionalLibs() {
-      {
-        fprintf(stderr, "Loading default additional libraries...\n");
-        // loading errors will be silent for the following optional libraries
-        if(!noGUI) {
-          libManager->loadLibrary("log_console", NULL, true);
-          libManager->loadLibrary("connexion_plugin", NULL, true);
-          libManager->loadLibrary("data_broker_gui", NULL, true);
-          libManager->loadLibrary("cfg_manager_gui", NULL, true);
-          libManager->loadLibrary("lib_manager_gui", NULL, true);
-          libManager->loadLibrary("SkyDomePlugin", NULL, true);
-          libManager->loadLibrary("CameraGUI", NULL, true);
-          libManager->loadLibrary("PythonMars", NULL, true);
-          libManager->loadLibrary("data_broker_plotter2", NULL, true);
-        }
-      }
-    }
-
     void MARS::start(int argc, char **argv, bool startThread,
                      bool handleLibraryLoading) {
 
       if(!initialized) init();
 
+      FILE *plugin_config;
       if(handleLibraryLoading) {
-<<<<<<< HEAD
-        loadCoreLibs();
-=======
         coreConfigFile = configDir+"/core_libs.txt";
         plugin_config = fopen(coreConfigFile.c_str() , "r");
         if(plugin_config) {
@@ -234,24 +189,17 @@ namespace mars {
           fprintf(stderr, "Loading default core libraries...\n");
           libManager->loadLibrary("data_broker");
           libManager->loadLibrary("mars_sim");
+          libManager->loadLibrary("mars_scene_loader");
+          libManager->loadLibrary("mars_entity_factory");
+          libManager->loadLibrary("mars_smurf");
+          libManager->loadLibrary("mars_smurf_loader");
           if(!noGUI) {
             libManager->loadLibrary("main_gui");
             libManager->loadLibrary("mars_graphics");
             libManager->loadLibrary("mars_gui");
             libManager->loadLibrary("entity_view");
           }
-
-          // TODO_A: why not add envire_manager as plugin over configuration files
-          libManager->loadLibrary("envire_managers");
-          libManager->loadLibrary("envire_smurf_loader");
-          libManager->loadLibrary("envire_graphics");
-          libManager->loadLibrary("mars_scene_loader");
-          
-          //libManager->loadLibrary("mars_entity_factory");
-          //libManager->loadLibrary("mars_smurf");
-          //clibManager->loadLibrary("mars_smurf_loader");
         }
->>>>>>> adapt mars to use envire managers
       }
 
       // then get the simulation
@@ -270,7 +218,6 @@ namespace mars {
         marsGui->setupGui();
       }
 
-#ifndef NO_GUI
       mars::main_gui::MainGUI *mainGui = NULL;
       mainGui = libManager->getLibraryAs<mars::main_gui::MainGUI>("main_gui");
 
@@ -281,43 +228,60 @@ namespace mars {
           // init osg
           //initialize graphicsFactory
           if(mainGui) {
+#ifdef __APPLE__
             marsGraphics->initializeOSG(NULL);
             QWidget *widget = (QWidget*)marsGraphics->getQTWidget(1);
             mainGui->mainWindow_p()->setCentralWidget(widget);
+            widget->show();
+#else
+            marsGraphics->initializeOSG(NULL, false);
+            QWidget *parent = new QWidget();
+            parent->setWindowTitle("main view");
+            unsigned long id = marsGraphics->new3DWindow(parent);
+            parent->resize(QSize(720, 405));
+            parent->setMinimumSize(QSize(50, 50));
+            mainGui->mainWindow_p()->setCentralWidget(parent);
+#endif
           }
           else {
             marsGraphics->initializeOSG(NULL, false);
           }
         }
       }
-#endif
 
       // load the simulation other_libs:
       if(handleLibraryLoading) {
         std::string otherConfigFile = configDir+"/other_libs.txt";
-        FILE *plugin_config = fopen(otherConfigFile.c_str() , "r");
+        plugin_config = fopen(otherConfigFile.c_str() , "r");
         if(plugin_config) {
           fclose(plugin_config);
           libManager->loadConfigFile(otherConfigFile);
         } else {
-          loadAdditionalLibs();
+          fprintf(stderr, "Loading default additional libraries...\n");
+          // loading errors will be silent for the following optional libraries
+          if(!noGUI) {
+            libManager->loadLibrary("log_console", NULL, true);
+            libManager->loadLibrary("connexion_plugin", NULL, true);
+            libManager->loadLibrary("data_broker_gui", NULL, true);
+            libManager->loadLibrary("cfg_manager_gui", NULL, true);
+            libManager->loadLibrary("lib_manager_gui", NULL, true);
+            libManager->loadLibrary("SkyDomePlugin", NULL, true);
+            libManager->loadLibrary("PythonMars", NULL, true);
+            libManager->loadLibrary("data_broker_plotter2", NULL, true);
+          }
         }
       }
 
-#ifndef NO_GUI
       // if we have a main gui, show it
       if(mainGui) mainGui->show();
-#endif
 
       control->sim->runSimulation(startThread);
 
-#ifndef NO_GUI
       if(needQApp) {
         graphicsTimer = new mars::app::GraphicsTimer(marsGraphics,
                                                      control->sim);
         graphicsTimer->run();
       }
-#endif
     }
 
 
@@ -365,10 +329,10 @@ namespace mars {
           break;
         switch (c) {
         case 'C':
-          if( mars::utils::pathExists(std::string(optarg)) ) {
+          if( QDir(QString(optarg)).exists() ) {
             configDir = optarg;
-            argConfDir = true;
-          }
+	    argConfDir = true;
+	  }
           else
             printf("The given configuration Directory does not exists: %s\n",
                    optarg);
